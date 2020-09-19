@@ -20,6 +20,7 @@ type RabbitMqClient struct {
 	subscribers  []subscriber
 	threadNum    int
 	maxRcAttempt int
+	rcStepTime   time.Duration
 }
 
 func NewRabbitMqClient(conn string, threadNum int, maxReconnectAttempt int) *RabbitMqClient {
@@ -27,6 +28,7 @@ func NewRabbitMqClient(conn string, threadNum int, maxReconnectAttempt int) *Rab
 		url:          conn,
 		threadNum:    threadNum,
 		maxRcAttempt: maxReconnectAttempt,
+		rcStepTime:   60 * time.Second,
 	}
 	mc.connectToBroker()
 	return mc
@@ -220,8 +222,7 @@ func (m *RabbitMqClient) reconnect() error {
 	logger := logrus.WithField("method", "reconnect").WithField("url", m.url)
 	logger.Infof("About to start reconnecting")
 
-	// TODO: Make step configurable.
-	step := 10 * time.Second
+	step := m.rcStepTime
 
 	for i := 1; i <= m.maxRcAttempt; i++ {
 		// Sleep between attempts of reconnecting to avoid consecutive errors
@@ -247,6 +248,10 @@ func (m *RabbitMqClient) reconnect() error {
 	}
 
 	return errors.New("maximum number of reconnect is reached")
+}
+
+func (m *RabbitMqClient) SetRcStepTime(t time.Duration) {
+	m.rcStepTime = t
 }
 
 func consumeLoop(wg *sync.WaitGroup, channel *amqp.Channel, deliveries <-chan amqp.Delivery, handlerFunc MessageHandler, names *QueueNameGenerator) {
